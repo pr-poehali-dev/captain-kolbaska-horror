@@ -61,6 +61,9 @@ export default function Index() {
   const [joystickActive, setJoystickActive] = useState(false);
   const [joystickStart, setJoystickStart] = useState<Position>({ x: 0, y: 0 });
   const [joystickCurrent, setJoystickCurrent] = useState<Position>({ x: 0, y: 0 });
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [oscillator, setOscillator] = useState<OscillatorNode | null>(null);
+  const [gainNode, setGainNode] = useState<GainNode | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([
     { id: 'first-blood', title: '💀 Первая пуля', description: 'Собрал первую пулю... это только начало', icon: '💀', unlocked: false, scary: true },
     { id: 'speed-demon', title: '⚡ Спринтер ужаса', description: 'Пробежал марафон страха за 2 минуты', icon: '⚡', unlocked: false, scary: false },
@@ -130,6 +133,21 @@ export default function Index() {
     for (let i = 0; i < 8; i++) {
       setTimeout(() => spawnBullet(), i * 500);
     }
+
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.value = 60;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    gain.gain.value = 0;
+    
+    osc.start();
+    setAudioContext(ctx);
+    setOscillator(osc);
+    setGainNode(gain);
   };
 
   const startBattle = useCallback(() => {
@@ -315,6 +333,31 @@ export default function Index() {
   );
   const dangerLevel = Math.max(0, 100 - (distance / 3));
   const bloodOpacity = Math.max(0, (100 - health) / 100);
+
+  useEffect(() => {
+    if (gameState === 'playing' && gainNode && oscillator && audioContext) {
+      const normalizedDistance = Math.max(0, Math.min(1, distance / 500));
+      const volume = Math.max(0, 0.25 - (normalizedDistance * 0.25));
+      const distortion = 1 - normalizedDistance;
+      
+      gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+      
+      const baseFreq = 55 + (distortion * 45);
+      const wobble = Math.sin(Date.now() / 150) * 15 * distortion;
+      oscillator.frequency.setValueAtTime(baseFreq + wobble, audioContext.currentTime);
+    }
+  }, [distance, gameState, gainNode, oscillator, audioContext]);
+
+  useEffect(() => {
+    return () => {
+      if (oscillator) {
+        try { oscillator.stop(); } catch (e) {}
+      }
+      if (audioContext) {
+        try { audioContext.close(); } catch (e) {}
+      }
+    };
+  }, [oscillator, audioContext]);
 
   const cameraX = Math.max(0, Math.min(WORLD_WIDTH - VIEWPORT_WIDTH, playerPos.x - VIEWPORT_WIDTH / 2));
   const cameraY = Math.max(0, Math.min(WORLD_HEIGHT - VIEWPORT_HEIGHT, playerPos.y - VIEWPORT_HEIGHT / 2));
@@ -525,7 +568,7 @@ export default function Index() {
 
           <div className="absolute bottom-8 left-8 z-30">
             <div 
-              className="relative w-36 h-36 bg-[#2D2D2D] rounded-full border-4 border-[#8B0000] shadow-[0_0_20px_rgba(139,0,0,0.5)] flex items-center justify-center"
+              className="relative w-52 h-52 bg-[#2D2D2D] rounded-full border-4 border-[#8B0000] shadow-[0_0_20px_rgba(139,0,0,0.5)] flex items-center justify-center"
               onTouchStart={(e) => {
                 e.preventDefault();
                 const touch = e.touches[0];
@@ -561,14 +604,14 @@ export default function Index() {
               </div>
               
               <div 
-                className="w-14 h-14 bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-lg border-2 border-[#FFFFFF] transition-all duration-75 flex items-center justify-center"
+                className="w-24 h-24 bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-lg border-2 border-[#FFFFFF] transition-all duration-75 flex items-center justify-center"
                 style={{
                   transform: joystickActive 
-                    ? `translate(${Math.max(-45, Math.min(45, joystickCurrent.x - joystickStart.x))}px, ${Math.max(-45, Math.min(45, joystickCurrent.y - joystickStart.y))}px)` 
+                    ? `translate(${Math.max(-70, Math.min(70, joystickCurrent.x - joystickStart.x))}px, ${Math.max(-70, Math.min(70, joystickCurrent.y - joystickStart.y))}px)` 
                     : 'translate(0, 0)',
                 }}
               >
-                <Icon name="Move" size={24} className="text-white" />
+                <Icon name="Move" size={36} className="text-white" />
               </div>
             </div>
           </div>
