@@ -26,16 +26,30 @@ interface Achievement {
   scary: boolean;
 }
 
-const WORLD_WIDTH = 2000;
-const WORLD_HEIGHT = 1500;
-const VIEWPORT_WIDTH = 800;
-const VIEWPORT_HEIGHT = 600;
+const WORLD_WIDTH = 3000;
+const WORLD_HEIGHT = 2000;
+const VIEWPORT_WIDTH = window.innerWidth;
+const VIEWPORT_HEIGHT = window.innerHeight;
 const PLAYER_SIZE = 60;
 const ENEMY_SIZE = 70;
 const BULLET_SIZE = 25;
-const PLAYER_SPEED = 5;
-const ENEMY_BASE_SPEED = 2;
+const OBSTACLE_SIZE = 80;
+const PLAYER_SPEED = 4;
+const ENEMY_BASE_SPEED = 1.5;
 const BULLETS_TO_WIN = 15;
+
+const OBSTACLES: Position[] = [
+  { x: 400, y: 300 },
+  { x: 800, y: 600 },
+  { x: 1200, y: 400 },
+  { x: 1600, y: 800 },
+  { x: 2000, y: 500 },
+  { x: 500, y: 1200 },
+  { x: 1000, y: 1400 },
+  { x: 1800, y: 1200 },
+  { x: 2400, y: 700 },
+  { x: 2600, y: 1500 },
+];
 
 export default function Index() {
   const { toast } = useToast();
@@ -173,6 +187,16 @@ export default function Index() {
         newX = Math.max(0, Math.min(WORLD_WIDTH - PLAYER_SIZE, newX));
         newY = Math.max(0, Math.min(WORLD_HEIGHT - PLAYER_SIZE, newY));
 
+        for (const obstacle of OBSTACLES) {
+          const dx = newX + PLAYER_SIZE / 2 - (obstacle.x + OBSTACLE_SIZE / 2);
+          const dy = newY + PLAYER_SIZE / 2 - (obstacle.y + OBSTACLE_SIZE / 2);
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < (PLAYER_SIZE + OBSTACLE_SIZE) / 2) {
+            return prev;
+          }
+        }
+
         return { x: newX, y: newY };
       });
 
@@ -227,6 +251,14 @@ export default function Index() {
 
     return () => clearInterval(interval);
   }, [gameState, keys, playerPos, enemySpeed, unlockAchievement, startBattle, touchDirection]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      window.location.reload();
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (gameState === 'playing') {
@@ -298,8 +330,9 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1A1A1A] via-[#2D2D2D] to-[#1A1A1A] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-gradient-to-b from-[#1A1A1A] via-[#2D2D2D] to-[#1A1A1A] overflow-hidden" style={{ touchAction: 'none' }}>
       {gameState === 'menu' && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 overflow-auto">
         <Card className="w-full max-w-2xl p-8 bg-[#1A1A1A] border-[#8B0000] border-2 shadow-[0_0_30px_rgba(139,0,0,0.5)]">
           <div className="text-center space-y-6">
             <div className="space-y-2">
@@ -352,11 +385,12 @@ export default function Index() {
             </div>
           </div>
         </Card>
+        </div>
       )}
 
       {gameState === 'playing' && (
-        <div className="relative">
-          <div className="mb-4 flex gap-4 items-center justify-between">
+        <div className="fixed inset-0 flex flex-col">
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex gap-4 items-center bg-[#1A1A1A] bg-opacity-90 p-3 rounded-lg border border-[#8B0000]">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <Icon name="Heart" size={20} className="text-[#8B0000]" />
@@ -377,11 +411,9 @@ export default function Index() {
           </div>
 
           <div 
-            className="relative bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] border-4 border-[#4A0000] rounded-lg overflow-hidden shadow-[0_0_50px_rgba(139,0,0,0.7)]"
+            className="flex-1 relative bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] overflow-hidden"
             style={{ 
-              width: VIEWPORT_WIDTH, 
-              height: VIEWPORT_HEIGHT,
-              boxShadow: `0 0 ${dangerLevel}px rgba(139, 0, 0, ${dangerLevel / 100})`
+              boxShadow: `inset 0 0 ${dangerLevel}px rgba(139, 0, 0, ${dangerLevel / 100})`
             }}
           >
             <div 
@@ -390,7 +422,8 @@ export default function Index() {
                 width: WORLD_WIDTH,
                 height: WORLD_HEIGHT,
                 transform: `translate(${-cameraX}px, ${-cameraY}px)`,
-                transition: 'transform 0.1s linear',
+                transition: 'transform 0.05s linear',
+                willChange: 'transform',
               }}
             >
               <div className="absolute inset-0 opacity-10" style={{
@@ -430,6 +463,26 @@ export default function Index() {
                   className="w-full h-full rounded-full object-cover"
                 />
               </div>
+
+              {OBSTACLES.map((obstacle, index) => (
+                <div
+                  key={`obstacle-${index}`}
+                  className="absolute transition-all duration-100"
+                  style={{
+                    left: obstacle.x,
+                    top: obstacle.y,
+                    width: OBSTACLE_SIZE,
+                    height: OBSTACLE_SIZE,
+                    willChange: 'transform',
+                  }}
+                >
+                  <img 
+                    src="https://cdn.poehali.dev/projects/1e9fb502-8fe8-418b-8e7b-9ac13e212112/files/5c9bbb6f-c852-4a10-8d92-7436374472be.jpg"
+                    alt="Obstacle"
+                    className="w-full h-full object-contain drop-shadow-lg"
+                  />
+                </div>
+              ))}
 
               {bullets.map(bullet => (
                 <div
@@ -490,9 +543,9 @@ export default function Index() {
             </div>
           )}
 
-          <div className="mt-6 flex justify-center">
+          <div className="absolute bottom-8 left-8 z-20">
             <div 
-              className="relative w-40 h-40 bg-[#2D2D2D] rounded-full border-4 border-[#8B0000] shadow-[0_0_20px_rgba(139,0,0,0.5)] flex items-center justify-center"
+              className="relative w-36 h-36 bg-[#2D2D2D] rounded-full border-4 border-[#8B0000] shadow-[0_0_20px_rgba(139,0,0,0.5)] flex items-center justify-center opacity-80"
               onTouchStart={(e) => {
                 e.preventDefault();
                 const touch = e.touches[0];
@@ -528,11 +581,13 @@ export default function Index() {
               </div>
               
               <div 
-                className="w-16 h-16 bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-lg border-2 border-[#FFFFFF] transition-all duration-100"
+                className="w-14 h-14 bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-lg border-2 border-[#FFFFFF]"
                 style={{
                   transform: joystickActive 
-                    ? `translate(${Math.max(-50, Math.min(50, joystickCurrent.x - joystickStart.x))}px, ${Math.max(-50, Math.min(50, joystickCurrent.y - joystickStart.y))}px)` 
+                    ? `translate(${Math.max(-45, Math.min(45, joystickCurrent.x - joystickStart.x))}px, ${Math.max(-45, Math.min(45, joystickCurrent.y - joystickStart.y))}px)` 
                     : 'translate(0, 0)',
+                  transition: joystickActive ? 'none' : 'transform 0.2s ease-out',
+                  willChange: 'transform',
                 }}
               >
                 <Icon name="Move" size={32} className="text-white m-auto mt-2" />
