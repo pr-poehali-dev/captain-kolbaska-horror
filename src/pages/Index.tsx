@@ -42,6 +42,20 @@ const BULLET_SIZE = 25;
 const PLAYER_SPEED = 8;
 const ENEMY_BASE_SPEED = 3;
 const BULLETS_TO_WIN = 15;
+const WALL_THICKNESS = 100;
+
+const WALLS = [
+  { x: 0, y: 0, width: WORLD_WIDTH, height: WALL_THICKNESS },
+  { x: 0, y: WORLD_HEIGHT - WALL_THICKNESS, width: WORLD_WIDTH, height: WALL_THICKNESS },
+  { x: 0, y: 0, width: WALL_THICKNESS, height: WORLD_HEIGHT },
+  { x: WORLD_WIDTH - WALL_THICKNESS, y: 0, width: WALL_THICKNESS, height: WORLD_HEIGHT },
+  { x: 500, y: 300, width: 300, height: 100 },
+  { x: 1200, y: 600, width: 100, height: 400 },
+  { x: 1800, y: 200, width: 400, height: 100 },
+  { x: 2200, y: 800, width: 200, height: 600 },
+  { x: 800, y: 1200, width: 500, height: 150 },
+  { x: 1500, y: 1500, width: 300, height: 200 },
+];
 
 export default function Index() {
   const { toast } = useToast();
@@ -239,8 +253,19 @@ export default function Index() {
         newX += touchDirection.x * PLAYER_SPEED;
         newY += touchDirection.y * PLAYER_SPEED;
 
-        newX = Math.max(0, Math.min(WORLD_WIDTH - PLAYER_SIZE, newX));
-        newY = Math.max(0, Math.min(WORLD_HEIGHT - PLAYER_SIZE, newY));
+        newX = Math.max(WALL_THICKNESS, Math.min(WORLD_WIDTH - WALL_THICKNESS - PLAYER_SIZE, newX));
+        newY = Math.max(WALL_THICKNESS, Math.min(WORLD_HEIGHT - WALL_THICKNESS - PLAYER_SIZE, newY));
+
+        for (const wall of WALLS) {
+          if (
+            newX + PLAYER_SIZE > wall.x &&
+            newX < wall.x + wall.width &&
+            newY + PLAYER_SIZE > wall.y &&
+            newY < wall.y + wall.height
+          ) {
+            return prev;
+          }
+        }
 
         return { x: newX, y: newY };
       });
@@ -442,8 +467,9 @@ export default function Index() {
           </div>
 
           <div 
-            className="relative flex-1 bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] overflow-hidden"
+            className="relative flex-1 overflow-hidden"
             style={{ 
+              backgroundColor: '#1A1A1A',
               boxShadow: `inset 0 0 ${dangerLevel}px rgba(139, 0, 0, ${dangerLevel / 100})`
             }}
           >
@@ -454,11 +480,28 @@ export default function Index() {
                 height: WORLD_HEIGHT,
                 transform: `translate(${-cameraX}px, ${-cameraY}px)`,
                 transition: 'transform 0.05s linear',
+                backgroundImage: 'url(https://cdn.poehali.dev/projects/1e9fb502-8fe8-418b-8e7b-9ac13e212112/files/a97e032c-b89f-41eb-8d04-5645acc185cb.jpg)',
+                backgroundSize: '400px 400px',
+                backgroundRepeat: 'repeat',
               }}
             >
-              <div className="absolute inset-0 opacity-5" style={{
-                backgroundImage: 'repeating-linear-gradient(0deg, #8B0000 0px, transparent 1px, transparent 100px, #8B0000 101px), repeating-linear-gradient(90deg, #8B0000 0px, transparent 1px, transparent 100px, #8B0000 101px)',
-              }} />
+              {WALLS.map((wall, index) => (
+                <div
+                  key={`wall-${index}`}
+                  className="absolute shadow-2xl"
+                  style={{
+                    left: wall.x,
+                    top: wall.y,
+                    width: wall.width,
+                    height: wall.height,
+                    backgroundImage: 'url(https://cdn.poehali.dev/projects/1e9fb502-8fe8-418b-8e7b-9ac13e212112/files/cb9b92fe-13c8-408a-863f-993fec0dc9aa.jpg)',
+                    backgroundSize: '200px 200px',
+                    backgroundRepeat: 'repeat',
+                    border: '3px solid #4A4A4A',
+                    boxShadow: 'inset 0 0 20px rgba(0,0,0,0.8), 0 0 30px rgba(0,0,0,0.5)',
+                  }}
+                />
+              ))}
 
               {obstacles.map(obstacle => (
                 <div
