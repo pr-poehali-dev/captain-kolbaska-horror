@@ -48,6 +48,7 @@ export default function Index() {
   const [showScreamer, setShowScreamer] = useState(false);
   const [enemySpeed, setEnemySpeed] = useState(ENEMY_BASE_SPEED);
   const [battleShots, setBattleShots] = useState(0);
+  const [touchDirection, setTouchDirection] = useState<Position>({ x: 0, y: 0 });
   const [achievements, setAchievements] = useState<Achievement[]>([
     { id: 'first-blood', title: '💀 Первая пуля', description: 'Собрал первую пулю... это только начало', icon: '💀', unlocked: false, scary: true },
     { id: 'speed-demon', title: '⚡ Спринтер ужаса', description: 'Пробежал марафон страха за 2 минуты', icon: '⚡', unlocked: false, scary: false },
@@ -161,6 +162,9 @@ export default function Index() {
         if (keys.has('a') || keys.has('arrowleft')) newX -= PLAYER_SPEED;
         if (keys.has('d') || keys.has('arrowright')) newX += PLAYER_SPEED;
 
+        newX += touchDirection.x * PLAYER_SPEED;
+        newY += touchDirection.y * PLAYER_SPEED;
+
         newX = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, newX));
         newY = Math.max(0, Math.min(GAME_HEIGHT - PLAYER_SIZE, newY));
 
@@ -217,7 +221,7 @@ export default function Index() {
     }, 1000 / 60);
 
     return () => clearInterval(interval);
-  }, [gameState, keys, playerPos, enemySpeed, unlockAchievement, startBattle]);
+  }, [gameState, keys, playerPos, enemySpeed, unlockAchievement, startBattle, touchDirection]);
 
   useEffect(() => {
     if (gameState === 'playing') {
@@ -408,6 +412,47 @@ export default function Index() {
               </Badge>
             </div>
           )}
+
+          <div className="mt-6 grid grid-cols-3 gap-4 max-w-xs mx-auto">
+            <div />
+            <Button
+              onTouchStart={() => setTouchDirection({ x: 0, y: -1 })}
+              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
+              onMouseDown={() => setKeys(prev => new Set(prev).add('w'))}
+              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('w'); return newKeys; })}
+              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
+            >
+              <Icon name="ChevronUp" size={32} />
+            </Button>
+            <div />
+            <Button
+              onTouchStart={() => setTouchDirection({ x: -1, y: 0 })}
+              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
+              onMouseDown={() => setKeys(prev => new Set(prev).add('a'))}
+              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('a'); return newKeys; })}
+              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
+            >
+              <Icon name="ChevronLeft" size={32} />
+            </Button>
+            <Button
+              onTouchStart={() => setTouchDirection({ x: 0, y: 1 })}
+              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
+              onMouseDown={() => setKeys(prev => new Set(prev).add('s'))}
+              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('s'); return newKeys; })}
+              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
+            >
+              <Icon name="ChevronDown" size={32} />
+            </Button>
+            <Button
+              onTouchStart={() => setTouchDirection({ x: 1, y: 0 })}
+              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
+              onMouseDown={() => setKeys(prev => new Set(prev).add('d'))}
+              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('d'); return newKeys; })}
+              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
+            >
+              <Icon name="ChevronRight" size={32} />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -438,9 +483,29 @@ export default function Index() {
 
               <Progress value={(battleShots / 10) * 100} className="h-4 bg-[#2D2D2D]" />
 
-              <p className="text-[#FFFFFF] text-lg">
-                Нажимай <kbd className="px-3 py-1 bg-[#2D2D2D] rounded border border-[#8B0000]">SPACE</kbd> для выстрела!
-              </p>
+              <div className="space-y-4">
+                <p className="text-[#FFFFFF] text-lg">
+                  Нажимай <kbd className="px-3 py-1 bg-[#2D2D2D] rounded border border-[#8B0000]">SPACE</kbd> для выстрела!
+                </p>
+                <Button
+                  onClick={() => {
+                    if (collectedBullets > 0) {
+                      setCollectedBullets(prev => prev - 1);
+                      setBattleShots(prev => {
+                        const newShots = prev + 1;
+                        if (newShots >= 10) {
+                          setGameState('won');
+                          unlockAchievement('survivor');
+                        }
+                        return newShots;
+                      });
+                    }
+                  }}
+                  className="w-full bg-[#8B0000] hover:bg-[#6B0000] text-white text-2xl py-8 font-bold"
+                >
+                  🎯 ВЫСТРЕЛИТЬ
+                </Button>
+              </div>
             </div>
           </div>
         </Card>
