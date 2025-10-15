@@ -51,6 +51,9 @@ export default function Index() {
   const [enemySpeed, setEnemySpeed] = useState(ENEMY_BASE_SPEED);
   const [battleShots, setBattleShots] = useState(0);
   const [touchDirection, setTouchDirection] = useState<Position>({ x: 0, y: 0 });
+  const [joystickActive, setJoystickActive] = useState(false);
+  const [joystickStart, setJoystickStart] = useState<Position>({ x: 0, y: 0 });
+  const [joystickCurrent, setJoystickCurrent] = useState<Position>({ x: 0, y: 0 });
   const [achievements, setAchievements] = useState<Achievement[]>([
     { id: 'first-blood', title: '💀 Первая пуля', description: 'Собрал первую пулю... это только начало', icon: '💀', unlocked: false, scary: true },
     { id: 'speed-demon', title: '⚡ Спринтер ужаса', description: 'Пробежал марафон страха за 2 минуты', icon: '⚡', unlocked: false, scary: false },
@@ -260,9 +263,39 @@ export default function Index() {
     Math.pow(playerPos.x - enemyPos.x, 2) + Math.pow(playerPos.y - enemyPos.y, 2)
   );
   const dangerLevel = Math.max(0, 100 - (distance / 3));
+  const bloodOpacity = Math.max(0, (100 - health) / 100);
 
   const cameraX = Math.max(0, Math.min(WORLD_WIDTH - VIEWPORT_WIDTH, playerPos.x - VIEWPORT_WIDTH / 2));
   const cameraY = Math.max(0, Math.min(WORLD_HEIGHT - VIEWPORT_HEIGHT, playerPos.y - VIEWPORT_HEIGHT / 2));
+
+  const handleJoystickStart = (clientX: number, clientY: number) => {
+    setJoystickActive(true);
+    setJoystickStart({ x: clientX, y: clientY });
+    setJoystickCurrent({ x: clientX, y: clientY });
+  };
+
+  const handleJoystickMove = (clientX: number, clientY: number) => {
+    if (!joystickActive) return;
+    setJoystickCurrent({ x: clientX, y: clientY });
+    
+    const deltaX = clientX - joystickStart.x;
+    const deltaY = clientY - joystickStart.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const maxDistance = 60;
+    
+    if (distance > 5) {
+      const normalizedX = deltaX / distance;
+      const normalizedY = deltaY / distance;
+      setTouchDirection({ x: normalizedX, y: normalizedY });
+    } else {
+      setTouchDirection({ x: 0, y: 0 });
+    }
+  };
+
+  const handleJoystickEnd = () => {
+    setJoystickActive(false);
+    setTouchDirection({ x: 0, y: 0 });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A1A1A] via-[#2D2D2D] to-[#1A1A1A] flex items-center justify-center p-4">
@@ -428,6 +461,24 @@ export default function Index() {
             <div className="absolute top-4 right-4 bg-[#1A1A1A] bg-opacity-80 p-2 rounded border border-[#8B0000] text-[#FFFFFF] text-xs">
               📍 {Math.floor(playerPos.x)}, {Math.floor(playerPos.y)}
             </div>
+
+            <div 
+              className="absolute inset-0 pointer-events-none transition-opacity duration-300"
+              style={{
+                opacity: bloodOpacity,
+                background: 'radial-gradient(circle at center, transparent 30%, rgba(139, 0, 0, 0.3) 60%, rgba(139, 0, 0, 0.6) 100%)',
+              }}
+            >
+              <div className="absolute inset-0" style={{
+                backgroundImage: `
+                  radial-gradient(circle at 20% 30%, rgba(139, 0, 0, ${bloodOpacity * 0.4}) 0%, transparent 10%),
+                  radial-gradient(circle at 80% 40%, rgba(139, 0, 0, ${bloodOpacity * 0.3}) 0%, transparent 8%),
+                  radial-gradient(circle at 30% 70%, rgba(139, 0, 0, ${bloodOpacity * 0.5}) 0%, transparent 12%),
+                  radial-gradient(circle at 70% 80%, rgba(139, 0, 0, ${bloodOpacity * 0.4}) 0%, transparent 9%),
+                  radial-gradient(circle at 50% 20%, rgba(139, 0, 0, ${bloodOpacity * 0.3}) 0%, transparent 7%)
+                `,
+              }} />
+            </div>
           </div>
 
           {dangerLevel > 50 && (
@@ -439,45 +490,60 @@ export default function Index() {
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-3 gap-4 max-w-xs mx-auto">
-            <div />
-            <Button
-              onTouchStart={() => setTouchDirection({ x: 0, y: -1 })}
-              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
-              onMouseDown={() => setKeys(prev => new Set(prev).add('w'))}
-              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('w'); return newKeys; })}
-              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
+          <div className="mt-6 flex justify-center">
+            <div 
+              className="relative w-40 h-40 bg-[#2D2D2D] rounded-full border-4 border-[#8B0000] shadow-[0_0_20px_rgba(139,0,0,0.5)] flex items-center justify-center"
+              onTouchStart={(e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                handleJoystickStart(touch.clientX, touch.clientY);
+              }}
+              onTouchMove={(e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                handleJoystickMove(touch.clientX, touch.clientY);
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                handleJoystickEnd();
+              }}
+              onMouseDown={(e) => {
+                handleJoystickStart(e.clientX, e.clientY);
+              }}
+              onMouseMove={(e) => {
+                if (e.buttons === 1) {
+                  handleJoystickMove(e.clientX, e.clientY);
+                }
+              }}
+              onMouseUp={() => {
+                handleJoystickEnd();
+              }}
+              onMouseLeave={() => {
+                if (joystickActive) handleJoystickEnd();
+              }}
             >
-              <Icon name="ChevronUp" size={32} />
-            </Button>
-            <div />
-            <Button
-              onTouchStart={() => setTouchDirection({ x: -1, y: 0 })}
-              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
-              onMouseDown={() => setKeys(prev => new Set(prev).add('a'))}
-              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('a'); return newKeys; })}
-              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
-            >
-              <Icon name="ChevronLeft" size={32} />
-            </Button>
-            <Button
-              onTouchStart={() => setTouchDirection({ x: 0, y: 1 })}
-              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
-              onMouseDown={() => setKeys(prev => new Set(prev).add('s'))}
-              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('s'); return newKeys; })}
-              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
-            >
-              <Icon name="ChevronDown" size={32} />
-            </Button>
-            <Button
-              onTouchStart={() => setTouchDirection({ x: 1, y: 0 })}
-              onTouchEnd={() => setTouchDirection({ x: 0, y: 0 })}
-              onMouseDown={() => setKeys(prev => new Set(prev).add('d'))}
-              onMouseUp={() => setKeys(prev => { const newKeys = new Set(prev); newKeys.delete('d'); return newKeys; })}
-              className="bg-[#8B0000] hover:bg-[#6B0000] h-16 text-2xl"
-            >
-              <Icon name="ChevronRight" size={32} />
-            </Button>
+              <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                <div className="absolute w-1 h-full bg-[#8B0000]" />
+                <div className="absolute w-full h-1 bg-[#8B0000]" />
+              </div>
+              
+              <div 
+                className="w-16 h-16 bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-lg border-2 border-[#FFFFFF] transition-all duration-100"
+                style={{
+                  transform: joystickActive 
+                    ? `translate(${Math.max(-50, Math.min(50, joystickCurrent.x - joystickStart.x))}px, ${Math.max(-50, Math.min(50, joystickCurrent.y - joystickStart.y))}px)` 
+                    : 'translate(0, 0)',
+                }}
+              >
+                <Icon name="Move" size={32} className="text-white m-auto mt-2" />
+              </div>
+              
+              {!joystickActive && (
+                <div className="absolute bottom-2 text-xs text-[#FFFFFF] opacity-60">
+                  ДЖОЙСТИК
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
