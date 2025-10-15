@@ -17,6 +17,12 @@ interface Bullet {
   position: Position;
 }
 
+interface Obstacle {
+  id: number;
+  position: Position;
+  size: number;
+}
+
 interface Achievement {
   id: string;
   title: string;
@@ -33,23 +39,9 @@ const VIEWPORT_HEIGHT = window.innerHeight;
 const PLAYER_SIZE = 60;
 const ENEMY_SIZE = 70;
 const BULLET_SIZE = 25;
-const OBSTACLE_SIZE = 80;
-const PLAYER_SPEED = 4;
-const ENEMY_BASE_SPEED = 1.5;
+const PLAYER_SPEED = 8;
+const ENEMY_BASE_SPEED = 3;
 const BULLETS_TO_WIN = 15;
-
-const OBSTACLES: Position[] = [
-  { x: 400, y: 300 },
-  { x: 800, y: 600 },
-  { x: 1200, y: 400 },
-  { x: 1600, y: 800 },
-  { x: 2000, y: 500 },
-  { x: 500, y: 1200 },
-  { x: 1000, y: 1400 },
-  { x: 1800, y: 1200 },
-  { x: 2400, y: 700 },
-  { x: 2600, y: 1500 },
-];
 
 export default function Index() {
   const { toast } = useToast();
@@ -57,6 +49,7 @@ export default function Index() {
   const [playerPos, setPlayerPos] = useState<Position>({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 });
   const [enemyPos, setEnemyPos] = useState<Position>({ x: WORLD_WIDTH - 200, y: WORLD_HEIGHT - 200 });
   const [bullets, setBullets] = useState<Bullet[]>([]);
+  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
   const [collectedBullets, setCollectedBullets] = useState(0);
   const [health, setHealth] = useState(100);
   const [gameTime, setGameTime] = useState(0);
@@ -103,6 +96,21 @@ export default function Index() {
     setBullets(prev => [...prev, newBullet]);
   }, []);
 
+  const generateObstacles = useCallback(() => {
+    const newObstacles: Obstacle[] = [];
+    for (let i = 0; i < 20; i++) {
+      newObstacles.push({
+        id: i,
+        position: {
+          x: Math.random() * (WORLD_WIDTH - 100),
+          y: Math.random() * (WORLD_HEIGHT - 100),
+        },
+        size: 80 + Math.random() * 40,
+      });
+    }
+    setObstacles(newObstacles);
+  }, []);
+
   const triggerScreamer = useCallback(() => {
     setShowScreamer(true);
     unlockAchievement('screamer-victim');
@@ -118,7 +126,8 @@ export default function Index() {
     setGameTime(0);
     setBullets([]);
     setEnemySpeed(ENEMY_BASE_SPEED);
-    for (let i = 0; i < 5; i++) {
+    generateObstacles();
+    for (let i = 0; i < 8; i++) {
       setTimeout(() => spawnBullet(), i * 500);
     }
   };
@@ -128,9 +137,37 @@ export default function Index() {
     setBattleShots(0);
     toast({
       title: '⚔️ Финальная битва!',
-      description: 'Отстреливайся! Нажимай SPACE для выстрела!',
+      description: 'Отстреливайся! Нажимай SPACE или кнопку!',
     });
   }, [toast]);
+
+  const handleJoystickStart = (clientX: number, clientY: number) => {
+    setJoystickActive(true);
+    setJoystickStart({ x: clientX, y: clientY });
+    setJoystickCurrent({ x: clientX, y: clientY });
+  };
+
+  const handleJoystickMove = (clientX: number, clientY: number) => {
+    if (!joystickActive) return;
+    setJoystickCurrent({ x: clientX, y: clientY });
+    
+    const deltaX = clientX - joystickStart.x;
+    const deltaY = clientY - joystickStart.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    
+    if (distance > 5) {
+      const normalizedX = deltaX / distance;
+      const normalizedY = deltaY / distance;
+      setTouchDirection({ x: normalizedX, y: normalizedY });
+    } else {
+      setTouchDirection({ x: 0, y: 0 });
+    }
+  };
+
+  const handleJoystickEnd = () => {
+    setJoystickActive(false);
+    setTouchDirection({ x: 0, y: 0 });
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,16 +223,6 @@ export default function Index() {
 
         newX = Math.max(0, Math.min(WORLD_WIDTH - PLAYER_SIZE, newX));
         newY = Math.max(0, Math.min(WORLD_HEIGHT - PLAYER_SIZE, newY));
-
-        for (const obstacle of OBSTACLES) {
-          const dx = newX + PLAYER_SIZE / 2 - (obstacle.x + OBSTACLE_SIZE / 2);
-          const dy = newY + PLAYER_SIZE / 2 - (obstacle.y + OBSTACLE_SIZE / 2);
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          if (distance < (PLAYER_SIZE + OBSTACLE_SIZE) / 2) {
-            return prev;
-          }
-        }
 
         return { x: newX, y: newY };
       });
@@ -253,16 +280,8 @@ export default function Index() {
   }, [gameState, keys, playerPos, enemySpeed, unlockAchievement, startBattle, touchDirection]);
 
   useEffect(() => {
-    const handleResize = () => {
-      window.location.reload();
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
     if (gameState === 'playing') {
-      const spawnInterval = setInterval(spawnBullet, 3000);
+      const spawnInterval = setInterval(spawnBullet, 4000);
       return () => clearInterval(spawnInterval);
     }
   }, [gameState, spawnBullet]);
@@ -300,39 +319,9 @@ export default function Index() {
   const cameraX = Math.max(0, Math.min(WORLD_WIDTH - VIEWPORT_WIDTH, playerPos.x - VIEWPORT_WIDTH / 2));
   const cameraY = Math.max(0, Math.min(WORLD_HEIGHT - VIEWPORT_HEIGHT, playerPos.y - VIEWPORT_HEIGHT / 2));
 
-  const handleJoystickStart = (clientX: number, clientY: number) => {
-    setJoystickActive(true);
-    setJoystickStart({ x: clientX, y: clientY });
-    setJoystickCurrent({ x: clientX, y: clientY });
-  };
-
-  const handleJoystickMove = (clientX: number, clientY: number) => {
-    if (!joystickActive) return;
-    setJoystickCurrent({ x: clientX, y: clientY });
-    
-    const deltaX = clientX - joystickStart.x;
-    const deltaY = clientY - joystickStart.y;
-    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    const maxDistance = 60;
-    
-    if (distance > 5) {
-      const normalizedX = deltaX / distance;
-      const normalizedY = deltaY / distance;
-      setTouchDirection({ x: normalizedX, y: normalizedY });
-    } else {
-      setTouchDirection({ x: 0, y: 0 });
-    }
-  };
-
-  const handleJoystickEnd = () => {
-    setJoystickActive(false);
-    setTouchDirection({ x: 0, y: 0 });
-  };
-
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-[#1A1A1A] via-[#2D2D2D] to-[#1A1A1A] overflow-hidden" style={{ touchAction: 'none' }}>
+    <div className="min-h-screen bg-gradient-to-b from-[#1A1A1A] via-[#2D2D2D] to-[#1A1A1A] flex items-center justify-center p-4">
       {gameState === 'menu' && (
-        <div className="absolute inset-0 flex items-center justify-center p-4 overflow-auto">
         <Card className="w-full max-w-2xl p-8 bg-[#1A1A1A] border-[#8B0000] border-2 shadow-[0_0_30px_rgba(139,0,0,0.5)]">
           <div className="text-center space-y-6">
             <div className="space-y-2">
@@ -352,7 +341,7 @@ export default function Index() {
                 Гомиков преследует тебя. Собери <span className="text-[#8B0000] font-bold">{BULLETS_TO_WIN} пуль</span>, чтобы дать отпор в финальной битве.
               </p>
               <div className="space-y-2 text-sm text-[#FFFFFF] opacity-80">
-                <p>🎮 Управление: WASD или стрелки</p>
+                <p>🎮 Управление: WASD или джойстик</p>
                 <p>⚔️ Битва: SPACE для выстрела</p>
                 <p>💀 Не дай ему поймать себя!</p>
               </div>
@@ -385,33 +374,32 @@ export default function Index() {
             </div>
           </div>
         </Card>
-        </div>
       )}
 
       {gameState === 'playing' && (
-        <div className="fixed inset-0 flex flex-col">
+        <div className="fixed inset-0 flex">
           <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex gap-4 items-center bg-[#1A1A1A] bg-opacity-90 p-3 rounded-lg border border-[#8B0000]">
-            <div className="flex-1">
+            <div className="w-32">
               <div className="flex items-center gap-2 mb-1">
-                <Icon name="Heart" size={20} className="text-[#8B0000]" />
-                <span className="text-[#FFFFFF] font-bold">{health}%</span>
+                <Icon name="Heart" size={16} className="text-[#8B0000]" />
+                <span className="text-[#FFFFFF] font-bold text-sm">{health}%</span>
               </div>
-              <Progress value={health} className="h-3 bg-[#2D2D2D]" />
+              <Progress value={health} className="h-2 bg-[#2D2D2D]" />
             </div>
             
-            <Badge className="bg-[#8B0000] text-white text-lg px-4 py-2">
-              <Icon name="CircleDot" size={20} className="mr-2" />
-              {collectedBullets} / {BULLETS_TO_WIN}
+            <Badge className="bg-[#8B0000] text-white px-3 py-1">
+              <Icon name="CircleDot" size={16} className="mr-1" />
+              {collectedBullets}/{BULLETS_TO_WIN}
             </Badge>
 
-            <div className="text-[#FFFFFF] font-[Roboto]">
-              <Icon name="Clock" size={20} className="inline mr-2" />
+            <div className="text-[#FFFFFF] text-sm">
+              <Icon name="Clock" size={16} className="inline mr-1" />
               {Math.floor(gameTime / 60)}:{(gameTime % 60).toString().padStart(2, '0')}
             </div>
           </div>
 
           <div 
-            className="flex-1 relative bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] overflow-hidden"
+            className="relative flex-1 bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] overflow-hidden"
             style={{ 
               boxShadow: `inset 0 0 ${dangerLevel}px rgba(139, 0, 0, ${dangerLevel / 100})`
             }}
@@ -423,21 +411,36 @@ export default function Index() {
                 height: WORLD_HEIGHT,
                 transform: `translate(${-cameraX}px, ${-cameraY}px)`,
                 transition: 'transform 0.05s linear',
-                willChange: 'transform',
               }}
             >
-              <div className="absolute inset-0 opacity-10" style={{
-                backgroundImage: 'repeating-linear-gradient(0deg, #8B0000 0px, transparent 1px, transparent 50px, #8B0000 51px), repeating-linear-gradient(90deg, #8B0000 0px, transparent 1px, transparent 50px, #8B0000 51px)',
+              <div className="absolute inset-0 opacity-5" style={{
+                backgroundImage: 'repeating-linear-gradient(0deg, #8B0000 0px, transparent 1px, transparent 100px, #8B0000 101px), repeating-linear-gradient(90deg, #8B0000 0px, transparent 1px, transparent 100px, #8B0000 101px)',
               }} />
 
+              {obstacles.map(obstacle => (
+                <div
+                  key={obstacle.id}
+                  className="absolute"
+                  style={{
+                    left: obstacle.position.x,
+                    top: obstacle.position.y,
+                    width: obstacle.size,
+                    height: obstacle.size,
+                  }}
+                >
+                  <div className="text-6xl">🥒</div>
+                </div>
+              ))}
+
               <div
-                className="absolute bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-[0_0_30px_rgba(139,0,0,0.9)] transition-all duration-100 border-4 border-[#FFFFFF]"
+                className="absolute bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-[0_0_30px_rgba(139,0,0,0.9)] border-4 border-[#FFFFFF]"
                 style={{
                   left: playerPos.x,
                   top: playerPos.y,
                   width: PLAYER_SIZE,
                   height: PLAYER_SIZE,
                   zIndex: 10,
+                  transition: 'left 0.05s linear, top 0.05s linear',
                 }}
               >
                 <img 
@@ -455,6 +458,7 @@ export default function Index() {
                   width: ENEMY_SIZE,
                   height: ENEMY_SIZE,
                   zIndex: 10,
+                  transition: 'left 0.05s linear, top 0.05s linear',
                 }}
               >
                 <img 
@@ -463,26 +467,6 @@ export default function Index() {
                   className="w-full h-full rounded-full object-cover"
                 />
               </div>
-
-              {OBSTACLES.map((obstacle, index) => (
-                <div
-                  key={`obstacle-${index}`}
-                  className="absolute transition-all duration-100"
-                  style={{
-                    left: obstacle.x,
-                    top: obstacle.y,
-                    width: OBSTACLE_SIZE,
-                    height: OBSTACLE_SIZE,
-                    willChange: 'transform',
-                  }}
-                >
-                  <img 
-                    src="https://cdn.poehali.dev/projects/1e9fb502-8fe8-418b-8e7b-9ac13e212112/files/5c9bbb6f-c852-4a10-8d92-7436374472be.jpg"
-                    alt="Obstacle"
-                    className="w-full h-full object-contain drop-shadow-lg"
-                  />
-                </div>
-              ))}
 
               {bullets.map(bullet => (
                 <div
@@ -511,10 +495,6 @@ export default function Index() {
               </div>
             )}
 
-            <div className="absolute top-4 right-4 bg-[#1A1A1A] bg-opacity-80 p-2 rounded border border-[#8B0000] text-[#FFFFFF] text-xs">
-              📍 {Math.floor(playerPos.x)}, {Math.floor(playerPos.y)}
-            </div>
-
             <div 
               className="absolute inset-0 pointer-events-none transition-opacity duration-300"
               style={{
@@ -532,20 +512,20 @@ export default function Index() {
                 `,
               }} />
             </div>
+
+            {dangerLevel > 50 && (
+              <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-20">
+                <Badge variant="destructive" className="bg-[#8B0000] text-white text-lg animate-pulse">
+                  <Icon name="TriangleAlert" size={20} className="mr-2" />
+                  ОН БЛИЗКО!
+                </Badge>
+              </div>
+            )}
           </div>
 
-          {dangerLevel > 50 && (
-            <div className="mt-4 text-center">
-              <Badge variant="destructive" className="bg-[#8B0000] text-white text-lg animate-pulse">
-                <Icon name="TriangleAlert" size={20} className="mr-2" />
-                ОН БЛИЗКО!
-              </Badge>
-            </div>
-          )}
-
-          <div className="absolute bottom-8 left-8 z-20">
+          <div className="absolute bottom-8 left-8 z-30">
             <div 
-              className="relative w-36 h-36 bg-[#2D2D2D] rounded-full border-4 border-[#8B0000] shadow-[0_0_20px_rgba(139,0,0,0.5)] flex items-center justify-center opacity-80"
+              className="relative w-36 h-36 bg-[#2D2D2D] rounded-full border-4 border-[#8B0000] shadow-[0_0_20px_rgba(139,0,0,0.5)] flex items-center justify-center"
               onTouchStart={(e) => {
                 e.preventDefault();
                 const touch = e.touches[0];
@@ -581,23 +561,15 @@ export default function Index() {
               </div>
               
               <div 
-                className="w-14 h-14 bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-lg border-2 border-[#FFFFFF]"
+                className="w-14 h-14 bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-lg border-2 border-[#FFFFFF] transition-all duration-75 flex items-center justify-center"
                 style={{
                   transform: joystickActive 
                     ? `translate(${Math.max(-45, Math.min(45, joystickCurrent.x - joystickStart.x))}px, ${Math.max(-45, Math.min(45, joystickCurrent.y - joystickStart.y))}px)` 
                     : 'translate(0, 0)',
-                  transition: joystickActive ? 'none' : 'transform 0.2s ease-out',
-                  willChange: 'transform',
                 }}
               >
-                <Icon name="Move" size={32} className="text-white m-auto mt-2" />
+                <Icon name="Move" size={24} className="text-white" />
               </div>
-              
-              {!joystickActive && (
-                <div className="absolute bottom-2 text-xs text-[#FFFFFF] opacity-60">
-                  ДЖОЙСТИК
-                </div>
-              )}
             </div>
           </div>
         </div>
