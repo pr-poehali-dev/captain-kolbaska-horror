@@ -40,8 +40,8 @@ const BULLETS_TO_WIN = 15;
 export default function Index() {
   const { toast } = useToast();
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'battle' | 'won' | 'dead'>('menu');
-  const [playerPos, setPlayerPos] = useState<Position>({ x: 100, y: 100 });
-  const [enemyPos, setEnemyPos] = useState<Position>({ x: GAME_WIDTH - 100, y: GAME_HEIGHT - 100 });
+  const [playerPos, setPlayerPos] = useState<Position>({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 });
+  const [enemyPos, setEnemyPos] = useState<Position>({ x: WORLD_WIDTH - 200, y: WORLD_HEIGHT - 200 });
   const [bullets, setBullets] = useState<Bullet[]>([]);
   const [collectedBullets, setCollectedBullets] = useState(0);
   const [health, setHealth] = useState(100);
