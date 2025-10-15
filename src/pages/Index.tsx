@@ -26,11 +26,13 @@ interface Achievement {
   scary: boolean;
 }
 
-const GAME_WIDTH = 800;
-const GAME_HEIGHT = 600;
-const PLAYER_SIZE = 40;
-const ENEMY_SIZE = 50;
-const BULLET_SIZE = 20;
+const WORLD_WIDTH = 2000;
+const WORLD_HEIGHT = 1500;
+const VIEWPORT_WIDTH = 800;
+const VIEWPORT_HEIGHT = 600;
+const PLAYER_SIZE = 60;
+const ENEMY_SIZE = 70;
+const BULLET_SIZE = 25;
 const PLAYER_SPEED = 5;
 const ENEMY_BASE_SPEED = 2;
 const BULLETS_TO_WIN = 15;
@@ -77,8 +79,8 @@ export default function Index() {
     const newBullet: Bullet = {
       id: Date.now(),
       position: {
-        x: Math.random() * (GAME_WIDTH - BULLET_SIZE),
-        y: Math.random() * (GAME_HEIGHT - BULLET_SIZE),
+        x: Math.random() * (WORLD_WIDTH - BULLET_SIZE),
+        y: Math.random() * (WORLD_HEIGHT - BULLET_SIZE),
       },
     };
     setBullets(prev => [...prev, newBullet]);
@@ -92,8 +94,8 @@ export default function Index() {
 
   const startGame = () => {
     setGameState('playing');
-    setPlayerPos({ x: 100, y: 100 });
-    setEnemyPos({ x: GAME_WIDTH - 100, y: GAME_HEIGHT - 100 });
+    setPlayerPos({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 });
+    setEnemyPos({ x: WORLD_WIDTH - 200, y: WORLD_HEIGHT - 200 });
     setCollectedBullets(0);
     setHealth(100);
     setGameTime(0);
@@ -165,8 +167,8 @@ export default function Index() {
         newX += touchDirection.x * PLAYER_SPEED;
         newY += touchDirection.y * PLAYER_SPEED;
 
-        newX = Math.max(0, Math.min(GAME_WIDTH - PLAYER_SIZE, newX));
-        newY = Math.max(0, Math.min(GAME_HEIGHT - PLAYER_SIZE, newY));
+        newX = Math.max(0, Math.min(WORLD_WIDTH - PLAYER_SIZE, newX));
+        newY = Math.max(0, Math.min(WORLD_HEIGHT - PLAYER_SIZE, newY));
 
         return { x: newX, y: newY };
       });
@@ -259,6 +261,9 @@ export default function Index() {
   );
   const dangerLevel = Math.max(0, 100 - (distance / 3));
 
+  const cameraX = Math.max(0, Math.min(WORLD_WIDTH - VIEWPORT_WIDTH, playerPos.x - VIEWPORT_WIDTH / 2));
+  const cameraY = Math.max(0, Math.min(WORLD_HEIGHT - VIEWPORT_HEIGHT, playerPos.y - VIEWPORT_HEIGHT / 2));
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1A1A1A] via-[#2D2D2D] to-[#1A1A1A] flex items-center justify-center p-4">
       {gameState === 'menu' && (
@@ -341,57 +346,74 @@ export default function Index() {
           <div 
             className="relative bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] border-4 border-[#4A0000] rounded-lg overflow-hidden shadow-[0_0_50px_rgba(139,0,0,0.7)]"
             style={{ 
-              width: GAME_WIDTH, 
-              height: GAME_HEIGHT,
+              width: VIEWPORT_WIDTH, 
+              height: VIEWPORT_HEIGHT,
               boxShadow: `0 0 ${dangerLevel}px rgba(139, 0, 0, ${dangerLevel / 100})`
             }}
           >
-            <div
-              className="absolute bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-[0_0_20px_rgba(139,0,0,0.8)] transition-all duration-100"
+            <div 
+              className="absolute inset-0"
               style={{
-                left: playerPos.x,
-                top: playerPos.y,
-                width: PLAYER_SIZE,
-                height: PLAYER_SIZE,
+                width: WORLD_WIDTH,
+                height: WORLD_HEIGHT,
+                transform: `translate(${-cameraX}px, ${-cameraY}px)`,
+                transition: 'transform 0.1s linear',
               }}
             >
-              <img 
-                src="https://cdn.poehali.dev/files/42a66c1a-fac1-4835-9323-b98048f5f313.jpg"
-                alt="Player"
-                className="w-full h-full rounded-full object-cover"
-              />
-            </div>
+              <div className="absolute inset-0 opacity-10" style={{
+                backgroundImage: 'repeating-linear-gradient(0deg, #8B0000 0px, transparent 1px, transparent 50px, #8B0000 51px), repeating-linear-gradient(90deg, #8B0000 0px, transparent 1px, transparent 50px, #8B0000 51px)',
+              }} />
 
-            <div
-              className="absolute bg-gradient-to-br from-[#FFFFFF] to-[#CCCCCC] rounded-full shadow-[0_0_30px_rgba(255,255,255,0.6)] animate-pulse"
-              style={{
-                left: enemyPos.x,
-                top: enemyPos.y,
-                width: ENEMY_SIZE,
-                height: ENEMY_SIZE,
-              }}
-            >
-              <img 
-                src="https://cdn.poehali.dev/files/6ce00014-cf93-4941-8e2e-4eb3c7e6cb8c.jpg"
-                alt="Enemy"
-                className="w-full h-full rounded-full object-cover"
-              />
-            </div>
-
-            {bullets.map(bullet => (
               <div
-                key={bullet.id}
-                className="absolute flex items-center justify-center text-2xl animate-pulse"
+                className="absolute bg-gradient-to-br from-[#8B0000] to-[#4A0000] rounded-full shadow-[0_0_30px_rgba(139,0,0,0.9)] transition-all duration-100 border-4 border-[#FFFFFF]"
                 style={{
-                  left: bullet.position.x,
-                  top: bullet.position.y,
-                  width: BULLET_SIZE,
-                  height: BULLET_SIZE,
+                  left: playerPos.x,
+                  top: playerPos.y,
+                  width: PLAYER_SIZE,
+                  height: PLAYER_SIZE,
+                  zIndex: 10,
                 }}
               >
-                💊
+                <img 
+                  src="https://cdn.poehali.dev/files/42a66c1a-fac1-4835-9323-b98048f5f313.jpg"
+                  alt="Player"
+                  className="w-full h-full rounded-full object-cover"
+                />
               </div>
-            ))}
+
+              <div
+                className="absolute bg-gradient-to-br from-[#FFFFFF] to-[#CCCCCC] rounded-full shadow-[0_0_40px_rgba(255,255,255,0.8)] animate-pulse border-4 border-[#8B0000]"
+                style={{
+                  left: enemyPos.x,
+                  top: enemyPos.y,
+                  width: ENEMY_SIZE,
+                  height: ENEMY_SIZE,
+                  zIndex: 10,
+                }}
+              >
+                <img 
+                  src="https://cdn.poehali.dev/files/6ce00014-cf93-4941-8e2e-4eb3c7e6cb8c.jpg"
+                  alt="Enemy"
+                  className="w-full h-full rounded-full object-cover"
+                />
+              </div>
+
+              {bullets.map(bullet => (
+                <div
+                  key={bullet.id}
+                  className="absolute flex items-center justify-center text-3xl animate-pulse shadow-lg"
+                  style={{
+                    left: bullet.position.x,
+                    top: bullet.position.y,
+                    width: BULLET_SIZE,
+                    height: BULLET_SIZE,
+                    filter: 'drop-shadow(0 0 10px rgba(139, 0, 0, 0.8))',
+                  }}
+                >
+                  💊
+                </div>
+              ))}
+            </div>
 
             {showScreamer && (
               <div className="absolute inset-0 bg-red-600 flex items-center justify-center z-50 animate-pulse">
@@ -402,6 +424,10 @@ export default function Index() {
                 />
               </div>
             )}
+
+            <div className="absolute top-4 right-4 bg-[#1A1A1A] bg-opacity-80 p-2 rounded border border-[#8B0000] text-[#FFFFFF] text-xs">
+              📍 {Math.floor(playerPos.x)}, {Math.floor(playerPos.y)}
+            </div>
           </div>
 
           {dangerLevel > 50 && (
